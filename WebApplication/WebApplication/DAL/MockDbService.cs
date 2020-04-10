@@ -1,8 +1,7 @@
+using System;
 using System.Collections.Generic;
-using System.Collections;
-using System.Collections.ObjectModel;
-using System.Linq;
 using WebApplication.Models;
+using System.Data.SqlClient;
 
 namespace WebApplication.DAL
 {
@@ -10,18 +9,30 @@ namespace WebApplication.DAL
     {
         private static List<Student> Students;
 
-        static MockDbService()
-        {
-            Students = new List<Student>
-            {
-                new Student{FirstName="Jan", LastName="Kowalski"},
-                new Student{FirstName="Anna", LastName="Malewski"},
-                new Student{FirstName="Andrzej", LastName="Andrzejewicz"}
-            };
-        }
         public IEnumerable<Student> GetStudents()
         {
-            return Students;
+            var studentsResult = new List<Student>();
+            using (var connection = new SqlConnection("Server=localhost,1433;User Id=sa; Password=password123!"))
+            using (var command = new SqlCommand())
+            {
+                command.Connection = connection;
+                command.CommandText = "select * from Student left join Enrollment E on Student.IdEnrollment = E.IdEnrollment left join Studies S on E.IdStudy = S.IdStudy;";
+                connection.Open();
+                var dataReader = command.ExecuteReader();
+                while (dataReader.Read())
+                {
+                    var student = new Student();
+                    student.IndexNumber = dataReader["IndexNumber"].ToString();
+                    student.FirstName = dataReader["FirstName"].ToString();
+                    student.LastName = dataReader["LastName"].ToString();
+                    student.BirthDate = Convert.ToDateTime(dataReader["BirthDate"].ToString());
+                    student.StudyName = dataReader["Name"].ToString();
+                    student.Semester = Convert.ToInt32(dataReader["Semester"].ToString());
+                    studentsResult.Add(student);
+                }
+            }
+
+            return studentsResult;
         }
 
         public void PutStudent(Student student)
@@ -29,15 +40,85 @@ namespace WebApplication.DAL
             Students.Add(student);
         }
 
-        public Student GetStudent(int id)
+        public Student GetStudent(string index)
         {
-            return Students.Find(s => s.IdStudent == id);
+            Student student = null;
+            using (var connection = new SqlConnection("Server=localhost,1433;User Id=sa; Password=password123!"))
+            using (var command = new SqlCommand())
+            {
+                SqlParameter indexParam = new SqlParameter();
+                indexParam.ParameterName = "@Index";
+                indexParam.Value = index;
+                command.Connection = connection;
+                command.CommandText = "select * from Student left join Enrollment E on Student.IdEnrollment = E.IdEnrollment left join Studies S on E.IdStudy = S.IdStudy where IndexNumber = @Index;";
+                command.Parameters.Add(indexParam);
+                connection.Open();
+                var dataReader = command.ExecuteReader();
+                while (dataReader.Read())
+                {
+                    student = new Student();
+                    student.IndexNumber = dataReader["IndexNumber"].ToString();
+                    student.FirstName = dataReader["FirstName"].ToString();
+                    student.LastName = dataReader["LastName"].ToString();
+                    student.BirthDate = Convert.ToDateTime(dataReader["BirthDate"].ToString());
+                    student.StudyName = dataReader["Name"].ToString();
+                    student.Semester = Convert.ToInt32(dataReader["Semester"].ToString());
+                }
+            }
+
+            return student;
         }
 
-        public void DeleteStudent(int id)
+        public void DeleteStudent(string id)
         {
-            Student toDelete = Students.Find(s => s.IdStudent == id);
-            Students.Remove(toDelete);
+            Console.WriteLine("Student deleted");
+        }
+
+        public IEnumerable<Student> GetSameSemesterStudents(string index)
+        {
+            var studentsResult = new List<Student>();
+            SqlConnection connection = null;
+            SqlDataReader dataReader = null;
+            try
+            {
+                connection = new SqlConnection("Server=localhost,1433;User Id=sa; Password=password123!");
+                SqlCommand command = new SqlCommand(
+                    "select * from Student left join Enrollment E on Student.IdEnrollment = E.IdEnrollment left join Studies S on E.IdStudy = S.IdStudy where Semester = (select Semester from Student left join Enrollment E on Student.IdEnrollment = E.IdEnrollment left join Studies S on E.IdStudy = S.IdStudy where IndexNumber = @Index);",
+                    connection);
+                connection.Open();
+                SqlParameter indexParam = new SqlParameter();
+                indexParam.ParameterName = "@Index";
+                indexParam.Value = index;
+                command.Connection = connection;
+                command.Parameters.Add(indexParam);
+                dataReader = command.ExecuteReader();
+                while (dataReader.Read())
+                {
+                    var student = new Student();
+                    student.IndexNumber = dataReader["IndexNumber"].ToString();
+                    student.FirstName = dataReader["FirstName"].ToString();
+                    student.LastName = dataReader["LastName"].ToString();
+                    student.BirthDate = Convert.ToDateTime(dataReader["BirthDate"].ToString());
+                    student.StudyName = dataReader["Name"].ToString();
+                    student.Semester = Convert.ToInt32(dataReader["Semester"].ToString());
+                    studentsResult.Add(student);
+                }
+            }
+            finally
+            {
+                if (dataReader != null)
+                {
+                    dataReader.Close();
+                }
+
+                if (connection != null)
+                {
+                    connection.Close();
+                }
+                
+            }
+
+            return studentsResult;
         }
     }
 }

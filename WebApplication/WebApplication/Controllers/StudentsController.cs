@@ -23,7 +23,7 @@ namespace WebApplication.Controllers
         }
 
         [HttpGet("{id}")]
-        public IActionResult GetStudent(int id)
+        public IActionResult GetStudent(string id)
         {
             Student student = _dbService.GetStudent(id);
             if (student != null) return Ok(student);
@@ -38,10 +38,17 @@ namespace WebApplication.Controllers
         }
 
         [HttpDelete("{id}")]
-        public IActionResult DeleteStudent(int id)
+        public IActionResult DeleteStudent(string id)
         {
             _dbService.DeleteStudent(id);
             return Ok("Usuwanie ukończone");
+        }
+        
+        [HttpGet("semester/{index}")]
+
+        public IActionResult GetSameSemesterStudents(string index)
+        {
+            return Ok(_dbService.GetSameSemesterStudents(index));
         }
     }
 }
