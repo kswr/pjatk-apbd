@@ -12,30 +12,34 @@ namespace WebApplication.Services
         {
             return new SqlConnection("Server=localhost,1433;User Id=sa; Password=password123!");
         }
+
         public IEnumerable<Student> GetStudents()
         {
             var studentsResult = new List<Student>();
-            using (var connection = ConnectionProducer())
-            using (var command = new SqlCommand())
+            using var connection = ConnectionProducer();
+            using var command = new SqlCommand
             {
-                command.Connection = connection;
-                command.CommandText =
-                    "select * from Student left join Enrollment E on Student.IdEnrollment = E.IdEnrollment left join Studies S on E.IdStudy = S.IdStudy;";
-                connection.Open();
-                var dataReader = command.ExecuteReader();
-                while (dataReader.Read())
+                Connection = connection,
+                CommandText =
+                    "select * from Student left join Enrollment E on Student.IdEnrollment = E.IdEnrollment left join Studies S on E.IdStudy = S.IdStudy;"
+            };
+            connection.Open();
+            var dataReader = command.ExecuteReader();
+            while (dataReader.Read())
+            {
+                var student = new Student
                 {
-                    var student = new Student();
-                    student.IndexNumber = dataReader["IndexNumber"].ToString();
-                    student.FirstName = dataReader["FirstName"].ToString();
-                    student.LastName = dataReader["LastName"].ToString();
-                    student.BirthDate = Convert.ToDateTime(dataReader["BirthDate"].ToString());
-                    student.StudyName = dataReader["Name"].ToString();
-                    student.Semester = Convert.ToInt32(dataReader["Semester"].ToString());
-                    studentsResult.Add(student);
-                }
+                    IndexNumber = dataReader["IndexNumber"].ToString(),
+                    FirstName = dataReader["FirstName"].ToString(),
+                    LastName = dataReader["LastName"].ToString(),
+                    BirthDate = Convert.ToDateTime(dataReader["BirthDate"].ToString()),
+                    StudyName = dataReader["Name"].ToString(),
+                    Semester = Convert.ToInt32(dataReader["Semester"].ToString())
+                };
+                studentsResult.Add(student);
             }
 
+            dataReader.Close();
             return studentsResult;
         }
 
@@ -47,28 +51,26 @@ namespace WebApplication.Services
         public Student GetStudent(string index)
         {
             Student student = null;
-            using (var connection = ConnectionProducer())
-            using (var command = new SqlCommand())
+            using var connection = ConnectionProducer();
+            using var command = new SqlCommand();
+            var indexParam = new SqlParameter {ParameterName = "@Index", Value = index};
+            command.Connection = connection;
+            command.CommandText =
+                "select * from Student left join Enrollment E on Student.IdEnrollment = E.IdEnrollment left join Studies S on E.IdStudy = S.IdStudy where IndexNumber = @Index;";
+            command.Parameters.Add(indexParam);
+            connection.Open();
+            var dataReader = command.ExecuteReader();
+            while (dataReader.Read())
             {
-                SqlParameter indexParam = new SqlParameter();
-                indexParam.ParameterName = "@Index";
-                indexParam.Value = index;
-                command.Connection = connection;
-                command.CommandText =
-                    "select * from Student left join Enrollment E on Student.IdEnrollment = E.IdEnrollment left join Studies S on E.IdStudy = S.IdStudy where IndexNumber = @Index;";
-                command.Parameters.Add(indexParam);
-                connection.Open();
-                var dataReader = command.ExecuteReader();
-                while (dataReader.Read())
+                student = new Student
                 {
-                    student = new Student();
-                    student.IndexNumber = dataReader["IndexNumber"].ToString();
-                    student.FirstName = dataReader["FirstName"].ToString();
-                    student.LastName = dataReader["LastName"].ToString();
-                    student.BirthDate = Convert.ToDateTime(dataReader["BirthDate"].ToString());
-                    student.StudyName = dataReader["Name"].ToString();
-                    student.Semester = Convert.ToInt32(dataReader["Semester"].ToString());
-                }
+                    IndexNumber = dataReader["IndexNumber"].ToString(),
+                    FirstName = dataReader["FirstName"].ToString(),
+                    LastName = dataReader["LastName"].ToString(),
+                    BirthDate = Convert.ToDateTime(dataReader["BirthDate"].ToString()),
+                    StudyName = dataReader["Name"].ToString(),
+                    Semester = Convert.ToInt32(dataReader["Semester"].ToString())
+                };
             }
 
             return student;
@@ -87,13 +89,11 @@ namespace WebApplication.Services
             try
             {
                 connection = ConnectionProducer();
-                SqlCommand command = new SqlCommand(
+                var command = new SqlCommand(
                     "select * from Student left join Enrollment E on Student.IdEnrollment = E.IdEnrollment left join Studies S on E.IdStudy = S.IdStudy where Semester = (select Semester from Student left join Enrollment E on Student.IdEnrollment = E.IdEnrollment left join Studies S on E.IdStudy = S.IdStudy where IndexNumber = @Index);",
                     connection);
                 connection.Open();
-                SqlParameter indexParam = new SqlParameter();
-                indexParam.ParameterName = "@Index";
-                indexParam.Value = index;
+                var indexParam = new SqlParameter {ParameterName = "@Index", Value = index};
                 command.Connection = connection;
                 command.Parameters.Add(indexParam);
                 dataReader = command.ExecuteReader();
@@ -111,42 +111,88 @@ namespace WebApplication.Services
             }
             finally
             {
-                if (dataReader != null)
-                {
-                    dataReader.Close();
-                }
-
-                if (connection != null)
-                {
-                    connection.Close();
-                }
+                dataReader?.Close();
+                connection?.Close();
             }
 
             return studentsResult;
         }
 
-        public string EnrollStudent(EnrollmentRequest request)
+        public int EnrollStudent(EnrollmentRequest request)
         {
-            if (!request.CorrectRequest() || !StudiesExist(request.Studies))
+            var idEnrollment = -1;
+            if (!request.CorrectRequest())
             {
-                return null;
+                return idEnrollment;
             }
-            return "ok";
-        }
 
-        private static bool StudiesExist(string studiesName)
-        {
             using var connection = ConnectionProducer();
-            var command = new SqlCommand("select * from Studies where Name = @StudiesName", connection);
-            var studiesNameParam = new SqlParameter {ParameterName = "@StudiesName", Value = studiesName};
+            using var command = new SqlCommand {Connection = connection};
+
             connection.Open();
-            command.Connection = connection;
-            command.Parameters.Add(studiesNameParam);
-            var dataReader = command.ExecuteReader();
-            var correct = dataReader.HasRows;
-            Console.WriteLine(correct);
-            dataReader.Close();
-            return correct;
+            var transaction = connection.BeginTransaction();
+
+            try
+            {
+                command.CommandText = "select IdStudy from Studies where Name=@studiesName";
+                command.Parameters.AddWithValue("name", request.Studies);
+
+                var sqlDataReader = command.ExecuteReader();
+                if (!sqlDataReader.Read())
+                {
+                    transaction.Rollback();
+                    return -1;
+                }
+            
+            var idStudies = (int) sqlDataReader["IdStudies"];
+            sqlDataReader.Close();
+            
+            command.CommandText = "select * from Enrollment where IdStudy=@idStudies and Semester=1";
+            command.Parameters.AddWithValue("idStudies", idStudies);
+            
+            sqlDataReader = command.ExecuteReader();
+            
+            
+            if (sqlDataReader.Read())
+            {
+                idEnrollment = (int) sqlDataReader["IdEnrollment"];
+            }
+            
+            sqlDataReader.Close();
+            
+            if (idEnrollment.Equals(-1))
+            {
+                command.CommandText =
+                    "INSERT INTO Enrollment(Semester, IdStudy, StartDate) VALUES(@semester, idStudy, startDate)";
+                command.Parameters.AddWithValue("semester", 1);
+                command.Parameters.AddWithValue("idStudy", idStudies);
+                command.Parameters.AddWithValue("startDate", DateTime.Now);
+                command.ExecuteNonQuery();
+            
+                command.CommandText = "select * from Enrollment where IdStudy=@idStudies and Semester=1";
+                command.Parameters.AddWithValue("idStudies", idStudies);
+                sqlDataReader = command.ExecuteReader();
+                idEnrollment = (int) sqlDataReader["IdEnrollment"];
+            }
+            
+            
+            command.CommandText =
+                "INSERT INTO Student(IndexNumber, FirstName, LastName, BirthDate, IdEnrollment) VALUES(@indexNumber, @firstName, @lastName, @birthDate, @idEnrollment)";
+            command.Parameters.AddWithValue("indexNumber", request.IndexNumber);
+            command.Parameters.AddWithValue("firstName", request.FirstName);
+            command.Parameters.AddWithValue("lastName", request.LastName);
+            command.Parameters.AddWithValue("birthDate", request.ExtractBirthDate());
+            command.Parameters.AddWithValue("idEnrollment", idEnrollment);
+            command.ExecuteNonQuery();
+            
+            transaction.Commit();
+            return idEnrollment;
+            }
+            catch (SqlException exc)
+            {
+                transaction.Rollback();
+            }
+            return idEnrollment;
         }
     }
 }

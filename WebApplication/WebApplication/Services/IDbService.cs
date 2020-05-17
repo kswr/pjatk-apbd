@@ -11,6 +11,6 @@ namespace WebApplication.Services
         public void DeleteStudent(string id);
         public Student GetStudent(string id);
         public IEnumerable<Student> GetSameSemesterStudents(string index);
-        public string EnrollStudent(EnrollmentRequest request);
+        public int EnrollStudent(EnrollmentRequest request);
     }
 }

@@ -21,9 +21,7 @@ namespace WebApplication.DTO.Requests
             var correct = true;
             foreach (var prop in typeof(EnrollmentRequest).GetProperties())
             {
-                Console.WriteLine("{0} = {1}", prop.Name, prop.GetValue(this, null));
                 if (!string.IsNullOrEmpty(prop.GetValue(this, null)?.ToString())) continue;
-                Console.WriteLine("wrong");
                 correct = false;
             }
             return correct;

@@ -20,7 +20,7 @@ namespace WebApplication.Controllers
         public IActionResult Enroll(EnrollmentRequest request)
         {
             var result = _dbService.EnrollStudent(request);
-            if (!string.IsNullOrEmpty(result))
+            if (!result.Equals(-1))
             {
                 return Ok(result);
             }
