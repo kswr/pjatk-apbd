@@ -5,10 +5,8 @@ using System.Data.SqlClient;
 
 namespace WebApplication.DAL
 {
-    public class MockDbService : IDbService
+    public class MsSqlDbService : IDbService
     {
-        private static List<Student> Students;
-
         public IEnumerable<Student> GetStudents()
         {
             var studentsResult = new List<Student>();
@@ -37,7 +35,7 @@ namespace WebApplication.DAL
 
         public void PutStudent(Student student)
         {
-            Students.Add(student);
+            // todo implement
         }
 
         public Student GetStudent(string index)
@@ -119,6 +117,11 @@ namespace WebApplication.DAL
             }
 
             return studentsResult;
+        }
+
+        public string EnrollStudent(EnrollmentRequest request)
+        {
+            throw new NotImplementedException();
         }
     }
 }

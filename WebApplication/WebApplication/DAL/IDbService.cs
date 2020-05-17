@@ -1,6 +1,5 @@
-using System;
-using System.Collections;
 using System.Collections.Generic;
+using WebApplication.Controllers;
 using WebApplication.Models;
 
 namespace WebApplication.DAL
@@ -12,5 +11,6 @@ namespace WebApplication.DAL
         public void DeleteStudent(string id);
         public Student GetStudent(string id);
         public IEnumerable<Student> GetSameSemesterStudents(string index);
+        public string EnrollStudent(EnrollmentRequest request);
     }
 }
