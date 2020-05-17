@@ -1,8 +1,8 @@
 using System.Collections.Generic;
-using WebApplication.Controllers;
+using WebApplication.DTO.Requests;
 using WebApplication.Models;
 
-namespace WebApplication.DAL
+namespace WebApplication.Services
 {
     public interface IDbService
     {

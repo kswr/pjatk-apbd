@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
-using WebApplication.DAL;
+using WebApplication.DTO.Requests;
 using WebApplication.Models;
+using WebApplication.Services;
 
 namespace WebApplication.Controllers
 {
@@ -18,7 +19,12 @@ namespace WebApplication.Controllers
         [HttpPost]
         public IActionResult Enroll(EnrollmentRequest request)
         {
-            return Ok(_dbService.EnrollStudent(request));
+            var result = _dbService.EnrollStudent(request);
+            if (!string.IsNullOrEmpty(result))
+            {
+                return Ok(result);
+            }
+            return BadRequest();
         }
     }
 }

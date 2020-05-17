@@ -1,20 +1,26 @@
 using System;
 using System.Collections.Generic;
-using WebApplication.Models;
 using System.Data.SqlClient;
+using WebApplication.DTO.Requests;
+using WebApplication.Models;
 
-namespace WebApplication.DAL
+namespace WebApplication.Services
 {
     public class MsSqlDbService : IDbService
     {
+        private static SqlConnection ConnectionProducer()
+        {
+            return new SqlConnection("Server=localhost,1433;User Id=sa; Password=password123!");
+        }
         public IEnumerable<Student> GetStudents()
         {
             var studentsResult = new List<Student>();
-            using (var connection = new SqlConnection("Server=localhost,1433;User Id=sa; Password=password123!"))
+            using (var connection = ConnectionProducer())
             using (var command = new SqlCommand())
             {
                 command.Connection = connection;
-                command.CommandText = "select * from Student left join Enrollment E on Student.IdEnrollment = E.IdEnrollment left join Studies S on E.IdStudy = S.IdStudy;";
+                command.CommandText =
+                    "select * from Student left join Enrollment E on Student.IdEnrollment = E.IdEnrollment left join Studies S on E.IdStudy = S.IdStudy;";
                 connection.Open();
                 var dataReader = command.ExecuteReader();
                 while (dataReader.Read())
@@ -41,14 +47,15 @@ namespace WebApplication.DAL
         public Student GetStudent(string index)
         {
             Student student = null;
-            using (var connection = new SqlConnection("Server=localhost,1433;User Id=sa; Password=password123!"))
+            using (var connection = ConnectionProducer())
             using (var command = new SqlCommand())
             {
                 SqlParameter indexParam = new SqlParameter();
                 indexParam.ParameterName = "@Index";
                 indexParam.Value = index;
                 command.Connection = connection;
-                command.CommandText = "select * from Student left join Enrollment E on Student.IdEnrollment = E.IdEnrollment left join Studies S on E.IdStudy = S.IdStudy where IndexNumber = @Index;";
+                command.CommandText =
+                    "select * from Student left join Enrollment E on Student.IdEnrollment = E.IdEnrollment left join Studies S on E.IdStudy = S.IdStudy where IndexNumber = @Index;";
                 command.Parameters.Add(indexParam);
                 connection.Open();
                 var dataReader = command.ExecuteReader();
@@ -79,7 +86,7 @@ namespace WebApplication.DAL
             SqlDataReader dataReader = null;
             try
             {
-                connection = new SqlConnection("Server=localhost,1433;User Id=sa; Password=password123!");
+                connection = ConnectionProducer();
                 SqlCommand command = new SqlCommand(
                     "select * from Student left join Enrollment E on Student.IdEnrollment = E.IdEnrollment left join Studies S on E.IdStudy = S.IdStudy where Semester = (select Semester from Student left join Enrollment E on Student.IdEnrollment = E.IdEnrollment left join Studies S on E.IdStudy = S.IdStudy where IndexNumber = @Index);",
                     connection);
@@ -113,7 +120,6 @@ namespace WebApplication.DAL
                 {
                     connection.Close();
                 }
-                
             }
 
             return studentsResult;
@@ -121,7 +127,26 @@ namespace WebApplication.DAL
 
         public string EnrollStudent(EnrollmentRequest request)
         {
-            throw new NotImplementedException();
+            if (!request.CorrectRequest() || !StudiesExist(request.Studies))
+            {
+                return null;
+            }
+            return "ok";
+        }
+
+        private static bool StudiesExist(string studiesName)
+        {
+            using var connection = ConnectionProducer();
+            var command = new SqlCommand("select * from Studies where Name = @StudiesName", connection);
+            var studiesNameParam = new SqlParameter {ParameterName = "@StudiesName", Value = studiesName};
+            connection.Open();
+            command.Connection = connection;
+            command.Parameters.Add(studiesNameParam);
+            var dataReader = command.ExecuteReader();
+            var correct = dataReader.HasRows;
+            Console.WriteLine(correct);
+            dataReader.Close();
+            return correct;
         }
     }
 }
